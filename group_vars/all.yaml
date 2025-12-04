@@ -1,0 +1,51 @@
+# Версии ПО
+asterisk_version: "20.9.0"
+freepbx_version: "17.0"
+php_version: "8.2"
+node_version: "18"
+
+# Настройки сети
+timezone: "Europe/Moscow"
+server_ip: "192.168.1.100"
+domain: "voip.local"
+
+# Настройки БД
+mysql_root_password: "SecureRootPass123!"
+asterisk_db_user: "asterisk"
+asterisk_db_password: "asterisk_123"
+
+# Настройки FreePBX
+freepbx_admin_password: "Admin@123"
+freepbx_webroot: "/var/www/html"
+
+# Настройки SIP
+sip_port: 5060
+sip_tls_port: 5061
+rtp_start: 10000
+rtp_end: 20000
+
+# Телефоны
+sip_phones:
+  - number: "101"
+    name: "Phone 1"
+    secret: "phone101secret"
+    model: "yealink"
+  - number: "102"
+    name: "Phone 2"
+    secret: "phone102secret"
+    model: "grandstream"
+  - number: "103"
+    name: "Phone 3"
+    secret: "phone103secret"
+    model: "cisco"
+
+# Очереди
+queues:
+  - name: "sales"
+    extension: "800"
+    members: ["101", "102", "103"]
+    strategy: "rrmemory"
+  - name: "support"
+    extension: "801"
+    members: ["101", "102"]
+    strategy: "leastrecent"

@@ -1,0 +1,460 @@
+---
+- name: Установка и настройка Asterisk + FreePBX на Debian
+  hosts: voip_servers
+  become: yes
+  vars_files:
+    - group_vars/all.yaml
+
+  tasks:
+    - name: Установка базовых пакетов
+      apt:
+        name:
+          - wget
+          - tar
+          - curl
+          - gnupg
+          - ca-certificates
+          - cron
+          - build-essential
+          - git
+          - ufw
+          - vim
+        state: present
+        update_cache: yes
+
+    - name: Настройка локали
+      locale_gen:
+        name: ru_RU.UTF-8
+        state: present
+
+    - name: Установка часового пояса
+      timezone:
+        name: "{{ timezone }}"
+
+    - name: Установка и запуск chrony
+      apt:
+        name: chrony
+        state: present
+      notify: restart chrony
+
+    - name: Настройка firewall
+      ufw:
+        rule: "{{ item.rule }}"
+        port: "{{ item.port }}"
+        proto: "{{ item.proto }}"
+      with_items:
+        - { rule: allow, port: "22", proto: tcp }
+        - { rule: allow, port: "80", proto: tcp }
+        - { rule: allow, port: "443", proto: tcp }
+        - { rule: allow, port: "{{ sip_port }}", proto: tcp }
+        - { rule: allow, port: "{{ sip_port }}", proto: udp }
+        - { rule: allow, port: "{{ sip_tls_port }}", proto: tcp }
+        - { rule: allow, port: "{{ sip_tls_port }}", proto: udp }
+        - { rule: allow, port: "{{ rtp_start }}:{{ rtp_end }}", proto: udp }
+      when: ansible_facts['os_family'] == 'Debian'
+
+    - name: Создание пользователя asterisk
+      user:
+        name: asterisk
+        shell: /bin/bash
+        create_home: yes
+        system: yes
+
+    - name: Установка MySQL
+      apt:
+        name:
+          - mysql-server
+          - mysql-client
+        state: present
+
+    - name: Запуск MySQL
+      systemd:
+        name: mysql
+        state: started
+        enabled: yes
+
+    - name: Настройка root пароля MySQL
+      mysql_user:
+        login_user: root
+        login_password: ""
+        name: root
+        password: "{{ mysql_root_password }}"
+        host: localhost
+        state: present
+
+    - name: Создание баз данных для Asterisk
+      mysql_db:
+        login_user: root
+        login_password: "{{ mysql_root_password }}"
+        name: "{{ item }}"
+        encoding: utf8
+        collation: utf8_general_ci
+        state: present
+      with_items:
+        - asterisk
+        - asteriskcdrdb
+
+    - name: Создание пользователя БД для Asterisk
+      mysql_user:
+        login_user: root
+        login_password: "{{ mysql_root_password }}"
+        name: "{{ asterisk_db_user }}"
+        password: "{{ asterisk_db_password }}"
+        host: localhost
+        priv: "asterisk.*:ALL,asteriskcdrdb.*:ALL"
+        state: present
+
+    - name: Установка NGINX
+      apt:
+        name: nginx
+        state: present
+
+    - name: Настройка NGINX для FreePBX
+      template:
+        src: templates/nginx-freepbx.conf.j2
+        dest: /etc/nginx/sites-available/freepbx
+      notify: restart nginx
+
+    - name: Активация сайта FreePBX
+      file:
+        src: /etc/nginx/sites-available/freepbx
+        dest: /etc/nginx/sites-enabled/freepbx
+        state: link
+      notify: restart nginx
+
+    - name: Отключение default сайта NGINX
+      file:
+        path: /etc/nginx/sites-enabled/default
+        state: absent
+      notify: restart nginx
+
+    - name: Добавление репозитория PHP
+      apt_repository:
+        repo: "deb https://packages.sury.org/php/ {{ ansible_distribution_release }} main"
+        state: present
+
+    - name: Установка ключа репозитория PHP
+      apt_key:
+        url: https://packages.sury.org/php/apt.gpg
+        state: present
+
+    - name: Установка PHP и модулей
+      apt:
+        name:
+          - "php{{ php_version }}"
+          - "php{{ php_version }}-fpm"
+          - "php{{ php_version }}-mysql"
+          - "php{{ php_version }}-curl"
+          - "php{{ php_version }}-gd"
+          - "php{{ php_version }}-mbstring"
+          - "php{{ php_version }}-bcmath"
+          - "php{{ php_version }}-xml"
+          - "php{{ php_version }}-zip"
+          - "php{{ php_version }}-soap"
+          - "php{{ php_version }}-intl"
+        state: present
+
+    - name: Настройка PHP для FreePBX
+      lineinfile:
+        path: "/etc/php/{{ php_version }}/fpm/php.ini"
+        regexp: "^{{ item.key }}"
+        line: "{{ item.key }} = {{ item.value }}"
+      with_items:
+        - { key: "upload_max_filesize", value: "128M" }
+        - { key: "post_max_size", value: "128M" }
+        - { key: "memory_limit", value: "512M" }
+        - { key: "max_execution_time", value: "360" }
+        - { key: "date.timezone", value: "{{ timezone }}" }
+      notify: restart php-fpm
+
+    - name: Создание пула PHP для FreePBX
+      copy:
+        dest: "/etc/php/{{ php_version }}/fpm/pool.d/asterisk.conf"
+        content: |
+          [asterisk]
+          user = asterisk
+          group = asterisk
+          listen = /run/php/php-fpm-asterisk.sock
+          listen.owner = www-data
+          listen.group = www-data
+          pm = dynamic
+          pm.max_children = 50
+          pm.start_servers = 5
+          pm.min_spare_servers = 5
+          pm.max_spare_servers = 35
+      notify: restart php-fpm
+
+    - name: Добавление репозитория NodeJS
+      shell: |
+        curl -fsSL https://deb.nodesource.com/setup_{{ node_version }}.x | bash -
+      args:
+        creates: /etc/apt/sources.list.d/nodesource.list
+
+    - name: Установка NodeJS
+      apt:
+        name: nodejs
+        state: present
+
+    - name: Установка зависимостей для сборки Asterisk
+      apt:
+        name:
+          - libedit-dev
+          - libxml2-dev
+          - libsqlite3-dev
+          - libssl-dev
+          - libcurl4-openssl-dev
+          - libpq-dev
+          - libncurses5-dev
+          - libnewt-dev
+          - libjansson-dev
+          - libsrtp2-dev
+          - libiksemel-dev
+          - libvorbis-dev
+          - libogg-dev
+          - libasound2-dev
+          - sox
+          - mpg123
+          - sqlite3
+          - odbc-postgresql
+          - unixodbc-dev
+        state: present
+
+    - name: Скачивание Asterisk
+      get_url:
+        url: "https://downloads.asterisk.org/pub/telephony/asterisk/asterisk-{{ asterisk_version }}.tar.gz"
+        dest: "/tmp/asterisk-{{ asterisk_version }}.tar.gz"
+        mode: "0644"
+
+    - name: Распаковка Asterisk
+      unarchive:
+        src: "/tmp/asterisk-{{ asterisk_version }}.tar.gz"
+        dest: /usr/src/
+        remote_src: yes
+        creates: "/usr/src/asterisk-{{ asterisk_version }}"
+
+    - name: Установка зависимостей Asterisk
+      shell: |
+        cd /usr/src/asterisk-{{ asterisk_version }}
+        ./contrib/scripts/install_prereq install <<< "7"
+      args:
+        chdir: /usr/src/asterisk-{{ asterisk_version }}
+
+    - name: Конфигурация Asterisk
+      shell: |
+        cd /usr/src/asterisk-{{ asterisk_version }}
+        ./configure --with-jansson-bundled
+      args:
+        chdir: /usr/src/asterisk-{{ asterisk_version }}
+
+    - name: Компиляция Asterisk
+      shell: |
+        cd /usr/src/asterisk-{{ asterisk_version }}
+        make -j$(nproc)
+      args:
+        chdir: /usr/src/asterisk-{{ asterisk_version }}
+
+    - name: Установка Asterisk
+      shell: |
+        cd /usr/src/asterisk-{{ asterisk_version }}
+        make install
+        make config
+        ldconfig
+      args:
+        chdir: /usr/src/asterisk-{{ asterisk_version }}
+
+    - name: Настройка пользователя Asterisk
+      lineinfile:
+        path: /etc/asterisk/asterisk.conf
+        regexp: "^#?{{ item.key }}"
+        line: "{{ item.key }} = {{ item.value }}"
+      with_items:
+        - { key: "runuser", value: "asterisk" }
+        - { key: "rungroup", value: "asterisk" }
+        - { key: "defaultlanguage", value: "ru" }
+        - { key: "documentation_language", value: "ru_RU" }
+
+    - name: Настройка прав на каталоги
+      file:
+        path: "{{ item }}"
+        owner: asterisk
+        group: asterisk
+        recurse: yes
+      with_items:
+        - /var/run/asterisk
+        - /etc/asterisk
+        - /var/lib/asterisk
+        - /var/log/asterisk
+        - /var/spool/asterisk
+
+    - name: Скачивание FreePBX
+      get_url:
+        url: "http://mirror.freepbx.org/modules/packages/freepbx/freepbx-{{ freepbx_version }}-latest.tgz"
+        dest: "/tmp/freepbx-{{ freepbx_version }}.tgz"
+        mode: "0644"
+
+    - name: Распаковка FreePBX
+      unarchive:
+        src: "/tmp/freepbx-{{ freepbx_version }}.tgz"
+        dest: /usr/src/
+        remote_src: yes
+        creates: "/usr/src/freepbx"
+
+    - name: Установка FreePBX
+      shell: |
+        cd /usr/src/freepbx
+        ./start_asterisk start
+        ./install -n \
+          --dbuser={{ asterisk_db_user }} \
+          --dbpass={{ asterisk_db_password }} \
+          --webroot={{ freepbx_webroot }} \
+          --user=asterisk \
+          --group=asterisk
+      args:
+        chdir: /usr/src/freepbx
+        creates: "{{ freepbx_webroot }}/admin"
+
+    - name: Настройка автоматического запуска FreePBX
+      shell: |
+        fwconsole ma downloadinstall pm2
+        fwconsole ma downloadinstall cdr
+        fwconsole ma downloadinstall certman
+        fwconsole ma downloadinstall sipsettings
+        fwconsole ma downloadinstall endpoint
+        fwconsole ma downloadinstall queue
+        fwconsole ma downloadinstall ivr
+        fwconsole ma downloadinstall recordings
+        fwconsole ma downloadinstall userman
+        fwconsole ma downloadinstall dashboard
+      args:
+        chdir: "{{ freepbx_webroot }}/admin"
+
+    - name: Создание скрипта настройки телефонов
+      template:
+        src: templates/extensions.conf.j2
+        dest: /etc/asterisk/extensions_custom.conf
+      notify: reload asterisk
+
+    - name: Настройка SIP телефонов через FreePBX API
+      uri:
+        url: "http://localhost/admin/api/api.php"
+        method: POST
+        body_format: form-urlencoded
+        body:
+          api_key: "{{ freepbx_admin_password }}"
+          api_action: "addExtension"
+          extension: "{{ item.number }}"
+          password: "{{ item.secret }}"
+          name: "{{ item.name }}"
+        status_code: 200
+      with_items: "{{ sip_phones }}"
+      register: phone_result
+
+    - name: Настройка очередей
+      uri:
+        url: "http://localhost/admin/api/api.php"
+        method: POST
+        body_format: form-urlencoded
+        body:
+          api_key: "{{ freepbx_admin_password }}"
+          api_action: "addQueue"
+          queue_name: "{{ item.name }}"
+          queue_number: "{{ item.extension }}"
+          strategy: "{{ item.strategy }}"
+          members: "{{ item.members | join(',') }}"
+        status_code: 200
+      with_items: "{{ queues }}"
+
+    - name: Настройка музыки ожидания
+      copy:
+        dest: /var/lib/asterisk/moh/moh.wav
+        src: /usr/share/asterisk/moh/*.wav
+        remote_src: yes
+
+    - name: Перезагрузка конфигурации FreePBX
+      shell: |
+        fwconsole reload
+        fwconsole restart
+      args:
+        chdir: "{{ freepbx_webroot }}/admin"
+
+    - name: Настройка автоматического запуска
+      systemd:
+        name: "{{ item }}"
+        enabled: yes
+        state: started
+      with_items:
+        - asterisk
+        - nginx
+        - "php{{ php_version }}-fpm"
+        - mysql
+
+    - name: Создание скрипта для настройки телефонов
+      copy:
+        dest: /usr/local/bin/configure-phones.sh
+        content: |
+          #!/bin/bash
+          # Скрипт настройки SIP телефонов
+
+          echo "Конфигурация для Yealink:"
+          echo "----------------------"
+          echo "SIP Server: {{ server_ip }}"
+          echo "SIP Port: {{ sip_port }}"
+          echo "Username: 101"
+          echo "Password: phone101secret"
+          echo ""
+
+          echo "Конфигурация для Grandstream:"
+          echo "---------------------------"
+          echo "Account 1 ->"
+          echo "SIP Server: {{ server_ip }}"
+          echo "SIP User ID: 102"
+          echo "Authenticate ID: 102"
+          echo "Authenticate Password: phone102secret"
+          echo ""
+
+          echo "Конфигурация для Cisco:"
+          echo "---------------------"
+          echo "Line 1 Configuration:"
+          echo "Extension: 103"
+          echo "Display Name: Phone 3"
+          echo "Proxy: {{ server_ip }}"
+          echo "Port: {{ sip_port }}"
+          echo "Password: phone103secret"
+        mode: "0755"
+
+    - name: Вывод информации о доступе
+      debug:
+        msg:
+          - "Установка завершена!"
+          - "FreePBX доступен по адресу: http://{{ server_ip }}"
+          - "Логин: admin"
+          - "Пароль: {{ freepbx_admin_password }}"
+          - ""
+          - "SIP телефоны:"
+          - "101 - Phone 1 (пароль: phone101secret)"
+          - "102 - Phone 2 (пароль: phone102secret)"
+          - "103 - Phone 3 (пароль: phone103secret)"
+          - ""
+          - "Очереди:"
+          - "800 - Отдел продаж"
+          - "801 - Поддержка"
+
+  handlers:
+    - name: restart nginx
+      systemd:
+        name: nginx
+        state: restarted
+
+    - name: restart php-fpm
+      systemd:
+        name: "php{{ php_version }}-fpm"
+        state: restarted
+
+    - name: restart chrony
+      systemd:
+        name: chrony
+        state: restarted
+
+    - name: reload asterisk
+      shell: |
+        asterisk -rx "core reload"

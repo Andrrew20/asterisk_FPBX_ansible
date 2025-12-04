@@ -1,0 +1,33 @@
+server {
+    listen 80;
+    listen [::]:80;
+    server_name {{ server_ip }};
+    
+    root {{ freepbx_webroot }};
+    index index.php index.html index.htm;
+    
+    client_max_body_size 128M;
+    
+    location / {
+        try_files $uri $uri/ /index.php?$query_string;
+    }
+    
+    location ~ \.php$ {
+        fastcgi_pass unix:/run/php/php-fpm-asterisk.sock;
+        fastcgi_index index.php;
+        fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
+        include fastcgi_params;
+        fastcgi_param HTTPS $https if_not_empty;
+    }
+    
+    location ~ /\.ht {
+        deny all;
+    }
+    
+    location /ws/ {
+        proxy_pass http://127.0.0.1:8088;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+    }
+}

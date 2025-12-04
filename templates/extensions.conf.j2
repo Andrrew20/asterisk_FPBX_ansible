@@ -1,0 +1,30 @@
+[from-internal-custom]
+; Базовая конфигурация для внутренних звонков
+
+; SIP телефоны
+exten => 101,1,Dial(PJSIP/101,30)
+exten => 101,n,Hangup()
+
+exten => 102,1,Dial(PJSIP/102,30)
+exten => 102,n,Hangup()
+
+exten => 103,1,Dial(PJSIP/103,30)
+exten => 103,n,Hangup()
+
+; Очереди
+exten => 800,1,Answer()
+exten => 800,n,Queue(sales,t,,,30)
+exten => 800,n,Hangup()
+
+exten => 801,1,Answer()
+exten => 801,n,Queue(support,t,,,30)
+exten => 801,n,Hangup()
+
+; Голосовая почта
+exten => *97,1,VoiceMailMain()
+exten => *97,n,Hangup()
+
+; Музыка ожидания
+exten => *68,1,Answer()
+exten => *68,n,MusicOnHold(default,30)
+exten => *68,n,Hangup()
