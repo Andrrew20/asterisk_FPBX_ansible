@@ -20,12 +20,12 @@
           - ufw
           - vim
         state: present
-        update_cache: yes
+        update_cache: no
 
-    - name: Настройка локали
-      locale_gen:
-        name: ru_RU.UTF-8
-        state: present
+    #- name: Настройка локали
+    #  locale_gen:
+    #    name: ru_RU.UTF-8
+    #    state: present
 
     - name: Установка часового пояса
       timezone:
@@ -56,9 +56,16 @@
     - name: Создание пользователя asterisk
       user:
         name: asterisk
+        #password: 123
         shell: /bin/bash
         create_home: yes
         system: yes
+
+    - name: Установка PyMySQL
+      apt:
+        name: python3-pymysql
+        state: present
+      when: ansible_facts['python']['version']['major'] == 3
 
     - name: Установка MySQL
       apt:
@@ -73,14 +80,29 @@
         state: started
         enabled: yes
 
+    - name: Проверка текущего пароля root
+      shell: |
+        mysql -u root -p'{{ mysql_root_password }}' -e
+        "SELECT 1" 2</dev/null && echo "OK" || echo "FAIL"
+      register: password_check
+      changed_when: false
+      #no_log: true
+
+    - name: Show stdout of password_check
+      debug:
+        var: password_check
+
     - name: Настройка root пароля MySQL
       mysql_user:
         login_user: root
-        login_password: ""
+        login_unix_socket: /var/run/mysqld/mysqld.sock
         name: root
         password: "{{ mysql_root_password }}"
         host: localhost
         state: present
+        plugin: mysql_native_password
+      when: password_check == "FAIL"
+      #no_log: true
 
     - name: Создание баз данных для Asterisk
       mysql_db:
@@ -94,6 +116,18 @@
         - asterisk
         - asteriskcdrdb
 
+    - name: Проверка текущего пароля asterisk
+      shell: |
+        mysql -u "{{ asterisk_db_user }}" -p'{{ asterisk_db_password }}' -e
+        "SELECT 1" 2</dev/null && echo "OK" || echo "FAIL"
+      register: user_build_check
+      changed_when: false
+      #no_log: true
+
+    - name: Show stdout of user_build_check
+      debug:
+        var: user_build_check
+
     - name: Создание пользователя БД для Asterisk
       mysql_user:
         login_user: root
@@ -103,6 +137,9 @@
         host: localhost
         priv: "asterisk.*:ALL,asteriskcdrdb.*:ALL"
         state: present
+      when: "'OK' not in user_build_check.stdout"
+      #no_log: true
+
 
     - name: Установка NGINX
       apt:
@@ -111,7 +148,7 @@
 
     - name: Настройка NGINX для FreePBX
       template:
-        src: templates/nginx-freepbx.conf.j2
+        src: templates/nginx-conf.j2
         dest: /etc/nginx/sites-available/freepbx
       notify: restart nginx
 
@@ -128,15 +165,15 @@
         state: absent
       notify: restart nginx
 
-    - name: Добавление репозитория PHP
-      apt_repository:
-        repo: "deb https://packages.sury.org/php/ {{ ansible_distribution_release }} main"
-        state: present
+    #- name: Добавление репозитория PHP
+    #  apt_repository:
+    #    repo: "deb https://packages.sury.org/php/ {{ ansible_distribution_release }} main"
+    #    state: present
 
-    - name: Установка ключа репозитория PHP
-      apt_key:
-        url: https://packages.sury.org/php/apt.gpg
-        state: present
+    #- name: Установка ключа репозитория PHP
+    #  apt_key:
+    #    url: https://packages.sury.org/php/apt.gpg
+    #    state: present
 
     - name: Установка PHP и модулей
       apt:
@@ -152,6 +189,8 @@
           - "php{{ php_version }}-zip"
           - "php{{ php_version }}-soap"
           - "php{{ php_version }}-intl"
+          - "php{{ php_version }}-snmp"
+
         state: present
 
     - name: Настройка PHP для FreePBX
@@ -219,11 +258,20 @@
           - unixodbc-dev
         state: present
 
+    - name: Check asterisk download
+      shell: |
+        asterisk -V 2>/dev/null | head -1 | grep -o '[0-9]\+
+        \.[0-9]\+\.[0-9]\+' || echo "not_installed"
+      register: asterisk_installed
+      changed_when: false
+
     - name: Скачивание Asterisk
       get_url:
         url: "https://downloads.asterisk.org/pub/telephony/asterisk/asterisk-{{ asterisk_version }}.tar.gz"
         dest: "/tmp/asterisk-{{ asterisk_version }}.tar.gz"
         mode: "0644"
+      register: download_asterisk
+      when: asterisk_installed == 'not_installed'
 
     - name: Распаковка Asterisk
       unarchive:
@@ -231,36 +279,42 @@
         dest: /usr/src/
         remote_src: yes
         creates: "/usr/src/asterisk-{{ asterisk_version }}"
+      when: asterisk_installed == 'not_installed'
 
     - name: Установка зависимостей Asterisk
       shell: |
-        cd /usr/src/asterisk-{{ asterisk_version }}
-        ./contrib/scripts/install_prereq install <<< "7"
+        cd "/usr/src/asterisk-20.17.0"
+        echo "7" | ./contrib/scripts/install_prereq install
       args:
-        chdir: /usr/src/asterisk-{{ asterisk_version }}
+        chdir: /usr/src/asterisk-20.17.0
+
+    - name: Check conf asterisk
+      stat:
+        path: /usr/src/asterisk-20.17.0
+      register: asterisk_conf
 
     - name: Конфигурация Asterisk
       shell: |
-        cd /usr/src/asterisk-{{ asterisk_version }}
+        cd /usr/src/asterisk-20.17.0
         ./configure --with-jansson-bundled
       args:
-        chdir: /usr/src/asterisk-{{ asterisk_version }}
+        chdir: /usr/src/asterisk-20.17.0
 
     - name: Компиляция Asterisk
       shell: |
-        cd /usr/src/asterisk-{{ asterisk_version }}
+        cd /usr/src/asterisk-20.17.0
         make -j$(nproc)
       args:
-        chdir: /usr/src/asterisk-{{ asterisk_version }}
+        chdir: /usr/src/asterisk-20.17.0
 
     - name: Установка Asterisk
       shell: |
-        cd /usr/src/asterisk-{{ asterisk_version }}
+        cd /usr/src/asterisk-20.17.0
         make install
         make config
         ldconfig
       args:
-        chdir: /usr/src/asterisk-{{ asterisk_version }}
+        chdir: /usr/src/asterisk-20.17.0
 
     - name: Настройка пользователя Asterisk
       lineinfile:

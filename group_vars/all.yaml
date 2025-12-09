@@ -1,7 +1,7 @@
 # Версии ПО
-asterisk_version: "20.9.0"
+asterisk_version: "20-current"
 freepbx_version: "17.0"
-php_version: "8.2"
+php_version: "8.3"
 node_version: "18"
 
 # Настройки сети
@@ -10,13 +10,13 @@ server_ip: "192.168.1.100"
 domain: "voip.local"
 
 # Настройки БД
-mysql_root_password: "SecureRootPass123!"
+mysql_root_password: "P@ssw0rd"
 asterisk_db_user: "asterisk"
 asterisk_db_password: "asterisk_123"
 
 # Настройки FreePBX
 freepbx_admin_password: "Admin@123"
-freepbx_webroot: "/var/www/html"
+freepbx_webroot: "/var/www/html/freepbx"
 
 # Настройки SIP
 sip_port: 5060
@@ -29,15 +29,15 @@ sip_phones:
   - number: "101"
     name: "Phone 1"
     secret: "phone101secret"
-    model: "yealink"
+    model: "phone"
   - number: "102"
     name: "Phone 2"
     secret: "phone102secret"
-    model: "grandstream"
+    model: "phone"
   - number: "103"
     name: "Phone 3"
     secret: "phone103secret"
-    model: "cisco"
+    model: "phone"
 
 # Очереди
 queues:
