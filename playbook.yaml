@@ -281,12 +281,20 @@
         creates: "/usr/src/asterisk-{{ asterisk_version }}"
       when: asterisk_installed == 'not_installed'
 
+    - name: Check of asterisk packets
+      shell: |
+        dpkg -l | grep -E 'libedit|libxml2|libsqlite3|libssl-dev|libjansson|libncurses'
+      register: deps_installed
+
     - name: Установка зависимостей Asterisk
       shell: |
-        cd "/usr/src/asterisk-20.17.0"
-        echo "7" | ./contrib/scripts/install_prereq install
+        cd "/usr/src/asterisk-20.17.0/contrib/scripts"
+        ./install_prereq install || true
       args:
-        chdir: /usr/src/asterisk-20.17.0
+        executable: /bin/bash
+      #ignore_errors: yes
+      changed_when: false
+      when: deps_installed.stdout|int < 3
 
     - name: Check conf asterisk
       stat:
@@ -313,6 +321,7 @@
         make install
         make config
         ldconfig
+        make samples
       args:
         chdir: /usr/src/asterisk-20.17.0
 
