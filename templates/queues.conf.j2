@@ -1,0 +1,51 @@
+[general]
+persistentmembers = yes
+monitor_type = MixMonitor
+autofill = yes
+shared_lastcall = yes
+
+{% for queue in queues %}
+[{{ queue.name }}]
+strategy = {{ queue.strategy }}
+timeout = {{ queue.timeout }}
+retry = 5
+maxlen = {{ queue.maxlen }}
+wrapuptime = {{ wueue.wrapuptime | default(10) }}
+
+; waiting nusic
+musicclass = {{ music_on_hold_class }}
+music = default
+music_on_hold = yes
+
+; Announcing
+announce = ruqueue-thankyou
+announce_frequency = 30
+announce_holdtime = {{ 'yes' if queue.announce_holdtime else 'no' }}
+announce_position = {{ 'yes' if queue.announce_position else 'no' }}
+
+; messages in queue
+queue_youarenext = ru/queue-youarenext
+queue_thereare = ru/queue-thereare
+queue_callswaiting = ru/queue-callswaiting
+queue_holdtime = ru/queue-holdtime
+queue_minutes = ru/queue-minutes
+queue_seconds = ru/queue-seconds
+queue_lessthan = ru/queue-lessthan
+queue_reporthold = ru/queue-reporthold
+
+; Operators in queue
+{% for member in queue.members %}
+member => PJSIP/{{ member }}
+{% endfor %}
+
+;monitoring parameters
+monitor_format = wav
+monitor_join_wav = yes
+
+{% endfor %}
+
+
+
+
+
+

@@ -1,0 +1,48 @@
+[global]
+user_agent = Asterisk PBX {{ asterisk_version }}
+max_initial_quality_time = 2000
+
+[transport-udp]
+type = transport
+protocol = udp
+bind = 0.0.0.0:{{ sip_port }}
+
+{% for phone in sip_phones %}
+
+[{{ phone.number }}]
+type = endpoint
+context = {{ phone.context }}
+disallow = all
+allow = ulaw
+allow = alaw
+allow = gsm
+auth = {{ phone.number }}-auth
+aors = {{ phone.number }}
+callerid = "{{ phone.name }}" <{{ phone.number }}>
+mailboxes = {{ phone.number }}@default
+
+direct_media = no
+force_rport = yes
+rtp_symmetric = yes
+rewrite_contact = yes
+transpo = transport-udp
+ice_support = no
+
+[{{ phone.number }}-auth]
+type = auth
+auth_type = userpass
+username = {{ phone.number }}
+password = {{ phone.passowrd }}
+
+[{{ phone.number }}]
+type = aor
+max_contacts = 5
+qualify_frequency = 60
+qualify_timeout = 3.0
+
+{% endfor %}
+
+[general]
+externip = {{ ansible_default_ipv4_address }}
+localnet = {{ local_network }}
+nat = force_rport,comedia

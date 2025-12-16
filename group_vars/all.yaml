@@ -6,8 +6,9 @@ node_version: "18"
 
 # Настройки сети
 timezone: "Europe/Moscow"
-server_ip: "192.168.1.100"
+server_ip: "192.168.0.13"
 domain: "voip.local"
+local_network: "192.168.0.0/24"
 
 # Настройки БД
 mysql_root_password: "P@ssw0rd"
@@ -26,26 +27,48 @@ rtp_end: 20000
 
 # Телефоны
 sip_phones:
+  - number: "100"
+    name: "Operator"
+    secret: "phone101"
+    context: "internal"
+    voicemail_pin: "1234"
+
   - number: "101"
-    name: "Phone 1"
-    secret: "phone101secret"
-    model: "phone"
+    name: "employe1"
+    secret: "phone102"
+    context: "internal"
+    voicemail_pin: "5678"
+
   - number: "102"
-    name: "Phone 2"
-    secret: "phone102secret"
-    model: "phone"
-  - number: "103"
-    name: "Phone 3"
-    secret: "phone103secret"
-    model: "phone"
+    name: "test1"
+    secret: "phone102"
+    context: "internal"
+    voicemail_pin: "9999"
 
 # Очереди
 queues:
-  - name: "sales"
-    extension: "800"
-    members: ["101", "102", "103"]
-    strategy: "rrmemory"
   - name: "support"
+    extension: "800"
+    timeout: 30
+    maxlen: 10
+    wrapuptime: 10
+    members: ["100", "102"]
+    strategy: "ringall"
+    announce_holdtime: yes
+    announce_position: yes
+
+  - name: "sales"
+    display_name: "sales"
     extension: "801"
-    members: ["101", "102"]
+    timeout: 25
+    maxlen: 5
+    members: ["101"]
     strategy: "leastrecent"
+    announce_holdtime: no
+
+music_on_hold_class: "default"
+install_music_on_hold: true
+
+voicemail_max_messages: 100
+voicemail_max_messages: 300
+voicemail_email_notification: false

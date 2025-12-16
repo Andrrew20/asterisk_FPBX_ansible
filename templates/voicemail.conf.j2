@@ -1,0 +1,21 @@
+[general]
+format = wav
+maxmessage = {{ voicemail_max_message_length | default(300) }}
+maxgreet = 60
+skipms = 3000
+maxsilence = 3
+minmessage = 2
+maxlogins = 3
+
+attach = yes
+pbxskip = yes
+emaildateformat = %A, %B, %d, %Y at %r
+servermail = asterisk@{{ ansible_hostname }}
+
+[zonemessages]
+europe/moscow = MSK-4MSD
+
+[default]
+{% for phone ins sip_phones %}
+{{ phone.number }} => {{ phone.voicemail_pin | default('1234') }},{{ phone.name }},{{ phone.email }},,attach=yes,delete=no
+{% endfor %}
