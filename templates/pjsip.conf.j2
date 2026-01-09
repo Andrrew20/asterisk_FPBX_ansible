@@ -46,3 +46,30 @@ qualify_timeout = 3.0
 externip = {{ ansible_default_ipv4.address }}
 localnet = {{ local_network }}
 nat = force_rport,comedia
+
+; НОВОЕ ТУУУУТТТ
+[general]
+context = phones
+udpbindaddr = 0.0.0.0:5060
+transport = udp
+
+; Отключаем ненужные кодеки
+disallow = all
+allow = ulaw
+allow = alaw
+
+{% for phone in phones %}
+[{{ phone.number }}]
+type = friend
+username = {{ phone.number }}
+secret = {{ phone.password }}
+host = dynamic
+context = phones
+callerid = "{{ phone.name }}" <{{ phone.number }}>
+qualify = yes
+qualifyfreq = 60
+dtmfmode = rfc2833
+canreinvite = no
+insecure = port,invite
+nat = force_rport,comedia
+{% endfor %}
