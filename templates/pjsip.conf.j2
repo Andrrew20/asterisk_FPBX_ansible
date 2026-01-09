@@ -32,7 +32,7 @@ ice_support = no
 type = auth
 auth_type = userpass
 username = {{ phone.number }}
-password = {{ phone.passowrd }}
+password = {{ phone.secret }}
 
 [{{ phone.number }}]
 type = aor
@@ -43,6 +43,6 @@ qualify_timeout = 3.0
 {% endfor %}
 
 [general]
-externip = {{ ansible_default_ipv4_address }}
+externip = {{ ansible_default_ipv4.address }}
 localnet = {{ local_network }}
 nat = force_rport,comedia

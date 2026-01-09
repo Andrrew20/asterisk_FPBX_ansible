@@ -27,7 +27,7 @@ same => n,Hangup()
 
 ;QUEUES
 {% for queue in queues %}
-exten => {{ queue.extension }},1,Answer()
+exten => {{ queue.extension }},0,Answer()
 same => n,Queue({{ queue.name }},t,,,{{ queue.timeout }},,{{queue.strategy}})
 same => n,PlayBACK(vm-nobodyavail)
 same => n,Hangup()
@@ -41,10 +41,10 @@ same => n,Background(ru/ivr-welcome)
 same => n,WaitExten(15)
 
 ; 1 - Tech podderzka
-exten => 1,1,Goto(internal,{{ asterisk_queues[0].extension }},1)
+exten => 1,1,Goto(internal,{{ queues[0].extension }},1)
 
 ; 2 - Sales
-exten => 2,1,Goto(internal,{{ asterisk_queues[1].extension }},1)
+exten => 2,1,Goto(internal,{{ queues[1].extension }},1)
 
 ; 3 - Operator
 exten => 3,1,Dial(PJSIP/100,20,m)

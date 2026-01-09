@@ -6,12 +6,13 @@ node_version: "18"
 
 # Настройки сети
 timezone: "Europe/Moscow"
-server_ip: "192.168.0.13"
+server_ip: "172.20.10.3"
 domain: "voip.local"
-local_network: "192.168.0.0/24"
+local_network: ["172.20.10.0/24"]
 
 # Настройки БД
-mysql_root_password: "P@ssw0rd"
+#mysql_root_password: "P@ssw0rd"
+mysql_root_password: "SecureRootPass123!"
 asterisk_db_user: "asterisk"
 asterisk_db_password: "asterisk_123"
 
@@ -32,18 +33,21 @@ sip_phones:
     secret: "phone101"
     context: "internal"
     voicemail_pin: "1234"
+    email: "andrey1@example.com"
 
   - number: "101"
     name: "employe1"
     secret: "phone102"
     context: "internal"
     voicemail_pin: "5678"
+    email: "sergey@example.com"
 
   - number: "102"
     name: "test1"
     secret: "phone102"
     context: "internal"
     voicemail_pin: "9999"
+    email: "andrey2@example.com"
 
 # Очереди
 queues:
@@ -65,10 +69,13 @@ queues:
     members: ["101"]
     strategy: "leastrecent"
     announce_holdtime: no
+    announce_position: no
 
 music_on_hold_class: "default"
 install_music_on_hold: true
 
-voicemail_max_messages: 100
+#voicemail_max_messages: 100
 voicemail_max_messages: 300
 voicemail_email_notification: false
+
+IVR_EXTEN: "500"

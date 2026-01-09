@@ -185,34 +185,53 @@
 
     - name: Installing rus sound
       apt:
-        name: asterisk_core_sounds-ru-wav
+        name: asterisk-core-sounds-ru-wav
         state: present
 
-    - name: Download await music
-      get_url:
-        url: "https://files.asterisk.org/pub/telephony/sounds/asterisk-moh-opsound-wav.tar.gz"
-        dest: /tmp/asterisk-moh.tar.gz
-      when: install_music_on_hold | default(true)
+    #- name: Download await music
+    #  get_url:
+    #    url: "https://downloads.asterisk.org/pub/telephony/sounds/asterisk-moh-opsound-wav.tar.gz"
+    #    dest: /tmp/asterisk-moh.tar.gz
+    #  when: install_music_on_hold | default(true)
 
-    - name: Unpack music
-      unarchive:
-        src: /tmp/asterisk-moh.tar.gz
-        dest: /var/lib/asterisk/moh/
-        remote_src: yes
-        creates: /var/lib/asterisk/moh/opsound
-      when: install_music_on_hold | default(true)
+    #- name: Unpack music
+    #  unarchive:
+    #    src: /tmp/asterisk-moh.tar.gz
+    #    dest: /var/lib/asterisk/moh/
+    #    remote_src: yes
+    #    creates: /var/lib/asterisk/moh/opsound
+    #  when: install_music_on_hold | default(true)
+
+    - name: Install sounds
+      become: yes
+      apt:
+        name: asterisk-moh-opsound-wav
+        state: present
+
+    - name: Ensure directory /etc/asterisk/pjsip.d exists
+      file:
+        path: /etc/asterisk/pjsip.d
+        state: directory
+        owner: root
+        mode: '0755'
 
     - name: Copy pjsip.conf (SIP phones)
       template:
-        src: "/templates/pjsip.conf.j2"
-        dest: /etc/asterisk/pjsip.conf
+        src: pjsip.conf.j2
+        dest: /etc/asterisk/pjsip.d/pjsip.conf
         owner: asterisk
         group: asterisk
         mode: '0640'
 
+    - name: Set queues variable
+      set_fact:
+        asterisk_queues:
+          - name: support
+            extension: 700
+
     - name: Copy extensions.conf (calls)
       template:
-        src: "/templates/extensions.conf.j2"
+        src: extensions.conf.j2
         dest: /etc/asterisk/extensions.conf
         owner: asterisk
         group: asterisk
@@ -220,15 +239,19 @@
 
     - name: Copy queues.conf
       template:
-        src: "/templates/queues.conf"
+        src: queues.conf.j2
         dest: /etc/asterisk/queues.conf
         owner: asterisk
         group: asterisk
         mode: '0640'
 
+
+
+
+
     - name: Copy voicemail.conf
       template:
-        src: "/templates/voicemail.conf.j2"
+        src: voicemail.conf.j2
         dest: /etc/asterisk/voicemail.conf
         owner: asterisk
         group: asterisk

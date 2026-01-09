@@ -20,7 +20,8 @@ music_on_hold = yes
 ; Announcing
 announce = ruqueue-thankyou
 announce_frequency = 30
-announce_holdtime = {{ 'yes' if queue.announce_holdtime else 'no' }}
+#announce_holdtime = {{ 'yes' if queue.announce_holdtime else 'no' }}
+announce_holdtime = yes
 announce_position = {{ 'yes' if queue.announce_position else 'no' }}
 
 ; messages in queue
@@ -31,7 +32,7 @@ queue_holdtime = ru/queue-holdtime
 queue_minutes = ru/queue-minutes
 queue_seconds = ru/queue-seconds
 queue_lessthan = ru/queue-lessthan
-queue_reporthold = ru/queue-reporthold
+;queue_reporthold = ru/queue-reporthold
 
 ; Operators in queue
 {% for member in queue.members %}
@@ -39,10 +40,10 @@ member => PJSIP/{{ member }}
 {% endfor %}
 
 ;monitoring parameters
-monitor_format = wav
-monitor_join_wav = yes
+;monitor_format = wav
+;monitor_join_wav = yes
 
-{% endfor %}
+;{% endfor %}
 
 
 

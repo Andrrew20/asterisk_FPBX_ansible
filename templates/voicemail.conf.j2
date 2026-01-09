@@ -16,6 +16,6 @@ servermail = asterisk@{{ ansible_hostname }}
 europe/moscow = MSK-4MSD
 
 [default]
-{% for phone ins sip_phones %}
+{% for phone in sip_phones %}
 {{ phone.number }} => {{ phone.voicemail_pin | default('1234') }},{{ phone.name }},{{ phone.email }},,attach=yes,delete=no
 {% endfor %}
