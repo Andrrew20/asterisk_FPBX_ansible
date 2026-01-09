@@ -66,3 +66,43 @@ same => n,Goto({{ IVR_EXTEN }},1)
 [outgoing]
 exten => _9.,1,Dial(PJSIP/provider/${EXTEN:1})
 same => n,Hangup()
+
+; новое ТУТААААА
+[general]
+static=yes
+writeprotect=no
+
+; Контекст для телефонов
+[phones]
+{% for phone in phones %}
+; Телефон {{ phone.number }}
+exten => {{ phone.number }},1,Verbose(2, Звонок на {{ phone.number }} от ${CALLERID(all)})
+same => n,Dial(SIP/{{ phone.number }},30)
+same => n,Hangup()
+{% endfor %}
+
+; Контекст для очередей
+[queues]
+{% for queue in queues %}
+; Очередь {{ queue.name }}
+exten => {{ queue.extension }},1,Verbose(2, Входящий в очередь {{ queue.name }})
+same => n,Answer()
+same => n,Queue({{ queue.name }},t,,,30)
+same => n,Hangup()
+{% endfor %}
+
+; Тестовый контекст для проверки
+[test]
+; Набрать 1000 для теста
+exten => 1000,1,Verbose(2, Тестовый звонок)
+same => n,Answer()
+same => n,Playback(beep)
+same => n,Wait(1)
+same => n,SayNumber(1000)
+same => n,Hangup()
+
+; Музыка на удержании
+exten => 3000,1,Verbose(2, Музыка на удержании)
+same => n,Answer()
+same => n,MusicOnHold(default,60)
+same => n,Hangup()
