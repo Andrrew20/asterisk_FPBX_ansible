@@ -46,7 +46,24 @@ member => PJSIP/{{ member }}
 ;{% endfor %}
 
 
+; НОВОЕЕЕ
+[general]
+persistentmembers = yes
 
+{% for queue in queues %}
+[{{ queue.name }}]
+musicclass = default
+strategy = ringall
+timeout = 30
+retry = 5
+maxlen = 10
+announce-frequency = 30
+announce-position = yes
+
+{% for member in queue.members %}
+member => SIP/{{ member }}
+{% endfor %}
+{% endfor %}
 
 
 
