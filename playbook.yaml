@@ -321,3 +321,176 @@
     #- name: reload asterisk
     #  shell: |
     #    asterisk -rx "core reload"
+
+---
+- name: Установка и настройка Asterisk
+  hosts: asterisk
+  become: yes
+  vars:
+    phones:
+      - number: "101"
+        password: "1111"
+        name: "Телефон 1"
+      - number: "102"
+        password: "2222"
+        name: "Телефон 2"
+      - number: "103"
+        password: "3333"
+        name: "Телефон 3"
+    
+    queues:
+      - name: "support"
+        extension: "200"
+        members: ["101", "102"]
+      - name: "sales"
+        extension: "201"
+        members: ["103"]
+
+  tasks:
+    # 1. Установка Asterisk (работает на Ubuntu 20.04/22.04)
+    - name: Обновить apt кеш
+      apt:
+        update_cache: yes
+        cache_valid_time: 3600
+      when: ansible_os_family == 'Debian'
+
+    - name: Установить Asterisk и зависимости
+      apt:
+        name:
+          - asterisk
+          - asterisk-core-sounds-ru-wav
+          - asterisk-moh-opsound-wav
+        state: present
+      when: ansible_os_family == 'Debian'
+
+    # 2. Создать базовые конфиги
+    - name: Создать extensions.conf
+      template:
+        src: templates/extensions.conf.j2
+        dest: /etc/asterisk/extensions.conf
+        owner: asterisk
+        group: asterisk
+        mode: '0644'
+
+    - name: Создать sip.conf
+      template:
+        src: templates/sip.conf.j2
+        dest: /etc/asterisk/sip.conf
+        owner: asterisk
+        group: asterisk
+        mode: '0644'
+
+    - name: Создать queues.conf
+      template:
+        src: templates/queues.conf.j2
+        dest: /etc/asterisk/queues.conf
+        owner: asterisk
+        group: asterisk
+        mode: '0644'
+
+    # 3. Создать modules.conf (важно!)
+    - name: Создать modules.conf
+      copy:
+        content: |
+          [modules]
+          autoload = yes
+          noload => chan_skinny.so
+          noload => chan_alsa.so
+          noload => chan_console.so
+          noload => chan_mgcp.so
+          noload => chan_ooh323.so
+          load => chan_sip.so
+          load => app_queue.so
+          load => app_musiconhold.so
+          load => codec_ulaw.so
+          load => codec_alaw.so
+          load => codec_gsm.so
+          load => format_wav.so
+          load => format_wav_gsm.so
+        dest: /etc/asterisk/modules.conf
+        owner: asterisk
+        group: asterisk
+        mode: '0644'
+
+    # 4. Настроить музыку на удержании
+    - name: Настроить musiconhold.conf
+      copy:
+        content: |
+          [general]
+          [default]
+          mode=files
+          directory=/var/lib/asterisk/moh
+        dest: /etc/asterisk/musiconhold.conf
+        owner: asterisk
+        group: asterisk
+
+    # 5. Скачать музыку для удержания (если нет)
+    - name: Создать директорию для музыки
+      file:
+        path: /var/lib/asterisk/moh
+        state: directory
+        owner: asterisk
+        group: asterisk
+
+    - name: Скачать тестовую музыку для удержания
+      get_url:
+        url: https://www.soundjay.com/communication/sounds/phone-call-1.wav
+        dest: /var/lib/asterisk/moh/sample.wav
+        mode: '0644'
+      when: not ansible_check_mode
+
+    # 6. Настроить права
+    - name: Настроить владельца для конфигов
+      file:
+        path: /etc/asterisk
+        owner: asterisk
+        group: asterisk
+        recurse: yes
+
+    # 7. Открыть порты в firewall
+    - name: Установить UFW если нет
+      apt:
+        name: ufw
+        state: present
+      when: ansible_os_family == 'Debian'
+
+    - name: Включить UFW
+      ufw:
+        state: enabled
+        direction: incoming
+        policy: deny
+
+    - name: Открыть порт SSH
+      ufw:
+        rule: allow
+        port: '22'
+        proto: tcp
+
+    - name: Открыть порт SIP
+      ufw:
+        rule: allow
+        port: '5060'
+        proto: udp
+
+    - name: Открыть порты RTP
+      ufw:
+        rule: allow
+        port: '10000:20000'
+        proto: udp
+
+    # 8. Перезапустить Asterisk
+    - name: Перезапустить Asterisk
+      systemd:
+        name: asterisk
+        state: restarted
+        enabled: yes
+
+    # 9. Проверить работу
+    - name: Проверить статус Asterisk
+      command: systemctl status asterisk
+      register: asterisk_status
+      changed_when: false
+
+    - name: Показать статус
+      debug:
+        msg: "Asterisk статус: {{ asterisk_status.stdout_lines | join('\n') }}"
