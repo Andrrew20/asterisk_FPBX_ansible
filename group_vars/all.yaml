@@ -16,10 +16,6 @@ mysql_root_password: "SecureRootPass123!"
 asterisk_db_user: "asterisk"
 asterisk_db_password: "asterisk_123"
 
-# Настройки FreePBX
-freepbx_admin_password: "Admin@123"
-freepbx_webroot: "/var/www/html/freepbx"
-
 # Настройки SIP
 sip_port: 5060
 sip_tls_port: 5061
@@ -28,23 +24,20 @@ rtp_end: 20000
 
 # Телефоны
 sip_phones:
-  - number: "100"
-    name: "Operator"
-    secret: "phone101"
+  - number: "101"
+    secret: "1111"
     context: "internal"
     voicemail_pin: "1234"
     email: "andrey1@example.com"
 
-  - number: "101"
-    name: "employe1"
-    secret: "phone102"
+  - number: "102"
+    secret: "2222"
     context: "internal"
     voicemail_pin: "5678"
     email: "sergey@example.com"
 
-  - number: "102"
-    name: "test1"
-    secret: "phone102"
+  - number: "103"
+    secret: "3333"
     context: "internal"
     voicemail_pin: "9999"
     email: "andrey2@example.com"
@@ -56,7 +49,7 @@ queues:
     timeout: 30
     maxlen: 10
     wrapuptime: 10
-    members: ["100", "102"]
+    members: ["101", "102"]
     strategy: "ringall"
     announce_holdtime: yes
     announce_position: yes
@@ -66,7 +59,7 @@ queues:
     extension: "801"
     timeout: 25
     maxlen: 5
-    members: ["101"]
+    members: ["103"]
     strategy: "leastrecent"
     announce_holdtime: no
     announce_position: no
@@ -74,7 +67,6 @@ queues:
 music_on_hold_class: "default"
 install_music_on_hold: true
 
-#voicemail_max_messages: 100
 voicemail_max_messages: 300
 voicemail_email_notification: false
 

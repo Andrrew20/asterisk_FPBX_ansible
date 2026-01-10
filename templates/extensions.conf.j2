@@ -1,74 +1,4 @@
 [general]
-static = yes
-writeprotect = no
-
-[globals]
-SUPPORT_QUEUE = support
-SALES_QUEUE = sales
-IVR_EXTEN = 500
-
-[internal]
-; internal calls
-exten => _1XX,1,NoOp(Calling on ${EXTEN} from ${CALLERID(all)})
-same => n,GotoIf($["${PJSIP_ENDPOINT(${EXTEN},auth)},auth" = ""]?notregistered)
-same => n,Dial(PJSIP/${EXTEN},30,gM(beep))
-same => n,Goto(vm-${EXTEN},1)
-
-same => n(notregistered),Playback(silence/1&invalid)
-same => n,Hangup()
-
-;Go to voicemail
-exten => _vm-1XX,1,Voicemail(${EXTEN:3}$default,u)
-same => n,Hangup()
-
-;Check voivemail
-exten => *98,1,VoicemailMain(${CALLERID}(num)@default)
-same => n,Hangup()
-
-;QUEUES
-{% for queue in queues %}
-exten => {{ queue.extension }},0,Answer()
-same => n,Queue({{ queue.name }},t,,,{{ queue.timeout }},,{{queue.strategy}})
-same => n,PlayBACK(vm-nobodyavail)
-same => n,Hangup()
-{% endfor %}
-
-;IVR Menu (music for call)
-exten => {{ IVR_EXTEN }},1,Answer()
-same => n,Set(TIMEOUT(digit)=15)
-same => n,Set(TIMEOUT(response)=30)
-same => n,Background(ru/ivr-welcome)
-same => n,WaitExten(15)
-
-; 1 - Tech podderzka
-exten => 1,1,Goto(internal,{{ queues[0].extension }},1)
-
-; 2 - Sales
-exten => 2,1,Goto(internal,{{ queues[1].extension }},1)
-
-; 3 - Operator
-exten => 3,1,Dial(PJSIP/100,20,m)
-
-; 4 - Voicemail
-exten => 4,1,VoicemailMain()
-
-; 0 - Menu Again
-exten => 0,1,Goto({{ IVR_EXTEN }},1)
-
-; Not correct inputs
-exten => i,1,PlayBACK(invalid)
-same => n,Goto({{ IVR_EXTEN }},1)
-
-; Timeout
-exten = t,1,PlayBACK(vm-goodbye)
-same => n,Goto({{ IVR_EXTEN }},1)
-
-[outgoing]
-exten => _9.,1,Dial(PJSIP/provider/${EXTEN:1})
-same => n,Hangup()
-
-; новое ТУТААААА
-[general]
 static=yes
 writeprotect=no
 
@@ -79,6 +9,8 @@ writeprotect=no
 exten => {{ phone.number }},1,Verbose(2, Звонок на {{ phone.number }} от ${CALLERID(all)})
 same => n,Dial(SIP/{{ phone.number }},30)
 same => n,Hangup()
+same => n,Playback(hello-world)
+same => n,Echo()
 {% endfor %}
 
 ; Контекст для очередей

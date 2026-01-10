@@ -1,0 +1,20 @@
+[general]
+context = phones
+udpbindaddr = 0.0.0.0:5060
+transport = udp
+
+; Отключаем ненужные кодеки
+disallow = all
+allow = ulaw
+allow = alaw
+
+{% for phone in phones %}
+[{{ phone.number }}]
+type = friend
+secret = {{ phone.password }}
+host = dynamic
+context = phones
+qualify = yes
+qualifyfreq = 60
+insecure = port,invite
+{% endfor %}
